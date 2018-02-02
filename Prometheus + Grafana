@@ -66,7 +66,7 @@ grant select on *.* to 'xxxxx_monitor'@'localhost';
 
 运行：mysqld_exporter   node_exporter
 
-/usr/local/mysqld_exporter-0.10.0.linux-amd64/mysqld_exporter --config.my-cnf="/usr/local/mysqld_exporter-0.10.0.linux-amd64/.my.cnf" &
+nohup /usr/local/mysqld_exporter-0.10.0.linux-amd64/mysqld_exporter --config.my-cnf="/usr/local/mysqld_exporter-0.10.0.linux-amd64/.my.cnf" &
 
 nohup /usr/local/node_exporter-0.15.2.linux-amd64/node_exporter &
 
