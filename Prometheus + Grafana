@@ -1,0 +1,113 @@
+Grafana端：
+yum install -y go
+go version
+
+wget https://github.com/prometheus/prometheus/releases/download/v2.1.0/prometheus-2.1.0.linux-amd64.tar.gz
+
+tar xvf prometheus-2.1.0.linux-amd64.tar.gz -C /usr/local
+cd /usr/local/
+ln -sv prometheus-2.1.0.linux-amd64 prometheus
+
+cd prometheus
+cp prometheus.yml prometheus.yml.bak
+
+vi prometheus.yml
+	
+global:
+  scrape_interval:     15s
+  evaluation_interval: 15s
+ 
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          instance: prometheus
+ 
+  - job_name: linux
+    static_configs:
+      - targets: ['10.10.0.186:9100']
+        labels:
+          instance: db1
+ 
+  - job_name: mysql
+    static_configs:
+      - targets: ['10.10.0.186:9104']
+        labels:
+          instance: db1
+
+启动：prometheus
+# ./prometheus --config.file=prometheus.yml
+
+
+被监控端：
+yum install go -y
+go version
+
+wget https://github.com/prometheus/node_exporter/releases/download/v0.15.2/node_exporter-0.15.2.linux-amd64.tar.gz
+wget https://github.com/prometheus/mysqld_exporter/releases/download/v0.10.0/mysqld_exporter-0.10.0.linux-amd64.tar.gz
+
+
+tar xvf node_exporter-0.15.2.linux-amd64.tar.gz -C /usr/local/
+
+tar xvf mysqld_exporter-0.10.0.linux-amd64.tar.gz -C /usr/local/
+
+vi /usr/local/mysqld_exporter-0.10.0.linux-amd64/.my.cnf
+[client]
+user=xxxxx_monitor
+password=pppppxxxxxdddd
+port=666666
+
+grant replication client,process on *.* to 'xxxxx_monitor'@'localhost' identified by 'passwddddddd';
+
+grant select on *.* to 'xxxxx_monitor'@'localhost';
+
+
+
+运行：mysqld_exporter   node_exporter
+
+/usr/local/mysqld_exporter-0.10.0.linux-amd64/mysqld_exporter --config.my-cnf="/usr/local/mysqld_exporter-0.10.0.linux-amd64/.my.cnf" &
+
+nohup /usr/local/node_exporter-0.15.2.linux-amd64/node_exporter &
+
+
+
+Grafana端：
+ wget https://s3-us-west-2.amazonaws.com/grafana-releases/release/grafana-4.2.0-1.x86_64.rpm 
+ sudo yum localinstall grafana-4.2.0-1.x86_64.rpm
+
+vi /etc/grafana/grafana.ini，修改dashboards.json段落下两个参数的值
+	
+[dashboards.json]
+enabled = true
+path = /var/lib/grafana/dashboards
+
+
+安装仪表盘（Percona提供）	
+ git clone https://github.com/percona/grafana-dashboards.git
+ cp -r grafana-dashboards/dashboards /var/lib/grafana
+
+运行以下命令为Grafana打个补丁，不然图表不能正常显示：
+
+ sed -i 's/expr=\(.\)\.replace(\(.\)\.expr,\(.\)\.scopedVars\(.*\)var \(.\)=\(.\)\.interval/expr=\1.replace(\2.expr,\3.scopedVars\4var \5=\1.replace(\6.interval, \3.scopedVars)/' /usr/share/grafana/public/app/plugins/datasource/prometheus/datasource.js
+
+ sed -i 's/,range_input/.replace(\/"{\/g,"\\"").replace(\/}"\/g,"\\""),range_input/; s/step_input:""/step_input:this.target.step/' /usr/share/grafana/public/app/plugins/datasource/prometheus/query_ctrl.js
+
+
+/etc/init.d/grafana-server restart
+
+http://monitor_host:3000
+Add data source
+Data Source:
+Config:
+Name: Prometheus	//开头字母一定要大写
+Type:Prometheus
+
+Http settings
+Url:http://localhost:9090
+Access:proxy
+
+
+iptables -I INPUT 11 -p tcp --dport 9100 -j ACCEPT
+iptables -I INPUT 11 -p tcp --dport 9104 -j ACCEPT
+iptables -I INPUT 11 -p tcp --dport 9090 -j ACCEPT
